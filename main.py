@@ -1,1 +1,1 @@
-print("Witaj, jestem piekarz bot!")
+print("Zaczynam piec chleb!")
