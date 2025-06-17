@@ -1,1 +1,1 @@
-print("Zaczynam piec chleb!")
+print("To linijka z test-gałęzi!")
