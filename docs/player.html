@@ -3,31 +3,43 @@
 <head>
   <meta charset="utf-8">
   <title>Sound Player</title>
+  <style>body{margin:0;background:transparent}</style>
 </head>
-<body style="margin:0; background:transparent;">
+<body>
   <audio id="player" autoplay></audio>
   <script>
-    const BASE = "https://piekarzone.github.io/PiekarzBot";
+    // Bazowy URL Twojej strony GitHub Pages
+    const BASE     = "https://piekarzone.github.io/PiekarzBot";
     const JSON_URL = `${BASE}/now_playing.json`;
     let lastTs = 0;
 
     async function poll() {
       try {
         const res = await fetch(JSON_URL, { cache: "no-store" });
-        const { sound, ts } = await res.json();
+        const obj = await res.json();
+        const { sound, ts } = obj;
+
+        // Jeśli pojawił się nowy timestamp – odtwarzamy
         if (ts && ts > lastTs) {
           lastTs = ts;
-          const a = document.getElementById("player");
-          // query-param wymusza przeładowanie pliku nawet przy tym samym URL
-          a.src = `${BASE}/sounds/${sound}.mp3?_=${ts}`;
-          a.load();
-          a.play();
+
+          // Jeśli JSON zawiera "boo.mp3", obcinamy końcówkę
+          let name = sound.endsWith(".mp3")
+            ? sound.slice(0, -4)
+            : sound;
+
+          const audio = document.getElementById("player");
+          // Dodajemy query-param, by wymusić nowy fetch pliku
+          audio.src = `${BASE}/sounds/${name}.mp3?_=${ts}`;
+          audio.load();
+          audio.play();
         }
       } catch (e) {
         console.error("Poll error:", e);
       }
     }
 
+    // Poll co sekundę
     setInterval(poll, 1000);
   </script>
 </body>
