@@ -1,10 +1,11 @@
 import os
 import socket
+import json
+import base64
 import requests
 from dotenv import load_dotenv
-from obswebsocket import obsws, requests as obs_requests
 
-# 1. Załaduj .env
+# 1. Załaduj konfigurację
 load_dotenv()
 TWITCH_SERVER = "irc.chat.twitch.tv"
 TWITCH_PORT = 6667
@@ -13,53 +14,46 @@ TWITCH_NICK = os.getenv("TWITCH_NICK")
 TWITCH_CHANNEL = os.getenv("TWITCH_CHANNEL").lower()
 CHANNEL = f"#{TWITCH_CHANNEL}"
 
-OBS_HOST = os.getenv("OBS_HOST")
-OBS_PORT = int(os.getenv("OBS_PORT"))
-OBS_PASS = os.getenv("OBS_PASS")
+GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
+GITHUB_REPO = os.getenv("GITHUB_REPO")  # format "User/Repo"
 
-# 2. Komendy
+HEADERS = {
+    "Authorization": f"token {GITHUB_TOKEN}",
+    "Accept": "application/vnd.github.v3+json"
+}
+
 komendy = {
     "!hello": "Przywitanie",
     "!help": "Lista komend",
     "!zart": "Losowy żart Chucka Norrisa",
     "!kot": "Link do kota",
-    "!boo": "Puszcza dźwięk BOO"
+    "!boo": "Dźwięk BOO",
+    "!ding": "Dźwięk DING"
 }
 
-# 3. Połączenie z OBS (Browser Source)
-ws = obsws(OBS_HOST, OBS_PORT, OBS_PASS)
-try:
-    ws.connect()
-    print(f"🔌 Połączono z OBS: {OBS_HOST}:{OBS_PORT}")
-except Exception as obs_connection_error:
-    print("❌ Nie udało się połączyć z OBS:", obs_connection_error)
+# 2. Funkcja aktualizująca now_playing.json
+def update_now_playing(sound_id: str):
+    path = "docs/now_playing.json"
+    api_url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{path}"
 
-def play_remote_audio(sound_id: str):
-    """
-    Zmienia URL Browser Source w OBS, by odtworzyć dźwięk z chmury.
-    """
-    base_url = "https://twojanazwa.github.io/player.html"  # <- ZMIEŃ NA WŁASNY URL
-    url = f"{base_url}?sound={sound_id}"
-    try:
-        ws.call(obs_requests.SetBrowserSourceProperties(
-            sourceName="remote_audio",
-            url=url
-        ))
-        print(f"🔊 Ustawiono URL dźwięku: {url}")
-    except Exception as obs_url_error:
-        print("❌ Błąd przy ustawianiu URL:", obs_url_error)
+    # Pobierz bieżącą wersję pliku, by zdobyć sha
+    resp_get = requests.get(api_url, headers=HEADERS)
+    resp_get.raise_for_status()
+    sha = resp_get.json()["sha"]
 
-def wyslij_wiadomosc(tresc: str):
-    sock.send(f"PRIVMSG {CHANNEL} :{tresc}\r\n".encode("utf-8"))
+    content_dict = {"sound": sound_id}
+    raw = json.dumps(content_dict, separators=(",", ":")).encode("utf-8")
+    b64 = base64.b64encode(raw).decode("utf-8")
 
-def czy_admin(tags_str: str) -> bool:
-    if not tags_str:
-        return False
-    parsed = dict(x.split("=", 1) for x in tags_str.split(";") if "=" in x)
-    badges = parsed.get("badges", "")
-    return "broadcaster" in badges or "moderator" in badges
+    payload = {
+        "message": f"Update now_playing to {sound_id}",
+        "content": b64,
+        "sha": sha
+    }
+    resp_put = requests.put(api_url, headers=HEADERS, json=payload)
+    resp_put.raise_for_status()
 
-# 4. Połącz z IRC Twitch
+# 3. IRC: połączenie z Twitch
 sock = socket.socket()
 sock.connect((TWITCH_SERVER, TWITCH_PORT))
 sock.send(f"PASS {TWITCH_TOKEN}\r\n".encode())
@@ -69,65 +63,76 @@ sock.send("CAP REQ :twitch.tv/tags\r\n".encode())
 sock.send("CAP REQ :twitch.tv/commands\r\n".encode())
 sock.send("CAP REQ :twitch.tv/membership\r\n".encode())
 
-print(f"✅ Zalogowano jako {TWITCH_NICK} na {CHANNEL}")
-wyslij_wiadomosc("🍞 Piekarzobot wita wszystkich!")
+print(f"✅ Zalogowano jako {TWITCH_NICK} w {CHANNEL}")
 
-# 5. Pętla główna
+def send_message(text: str):
+    sock.send(f"PRIVMSG {CHANNEL} :{text}\r\n".encode())
+
+def is_admin(tags: str) -> bool:
+    if not tags:
+        return False
+    parsed = dict(item.split("=", 1) for item in tags.split(";") if "=" in item)
+    badges = parsed.get("badges", "")
+    return "broadcaster" in badges or "moderator" in badges
+
+send_message("🍞 Piekarzobot gotowy do działania!")
+
+# 4. Pętla główna: odbieranie i parsowanie
 while True:
-    dane = sock.recv(2048).decode("utf-8", errors="ignore")
-    for linia in dane.split("\r\n"):
-        if not linia:
+    data = sock.recv(2048).decode("utf-8", errors="ignore")
+    for line in data.split("\r\n"):
+        if not line:
             continue
-        if linia.startswith("PING"):
+        if line.startswith("PING"):
             sock.send("PONG :tmi.twitch.tv\r\n".encode())
             continue
 
-        # Rozbij tagi i wiadomość
-        if linia.startswith("@"):
-            tags_part, content = linia.split(" ", 1)
+        # Rozdziel tagi od reszty
+        if line.startswith("@"):
+            tags_part, remainder = line.split(" ", 1)
         else:
             tags_part = ""
-            content = linia
+            remainder = line
 
-        parts = content.split(" ", 3)
+        parts = remainder.split(" ", 3)
         if len(parts) < 4:
             continue
+        prefix, _, _, raw_msg = parts
+        message = raw_msg.lstrip(":").strip()
+        sender = prefix.lstrip(":").split("!")[0].lower()
 
-        prefix, _, _, wiadomosc_raw = parts
-        wiadomosc = wiadomosc_raw.lstrip(":").strip()
-        uzytkownik = prefix.lstrip(":").split("!")[0].lower()
+        # Obsługa komend
+        if message == "!hello":
+            send_message(f"Hej {sender}, tu Twój piekarniczy bot! 🥖")
 
-        # Reakcje na komendy
-        if wiadomosc == "!hello":
-            wyslij_wiadomosc(f"Hej {uzytkownik}, tu Twój piekarniczy bot! 🥖")
+        elif message == "!help":
+            send_message("Komendy: " + "; ".join(f"{cmd} – {desc}"
+                                                for cmd, desc in komendy.items()))
 
-        elif wiadomosc == "!help":
-            tekst = "Komendy: " + "; ".join(f"{cmd} – {desc}" for cmd, desc in komendy.items())
-            wyslij_wiadomosc(tekst)
-
-        elif wiadomosc == "!zart":
+        elif message == "!zart":
             try:
-                res = requests.get("https://api.chucknorris.io/jokes/random", timeout=5)
-                res.raise_for_status()
-                joke = res.json().get("value", "")
-                wyslij_wiadomosc(f"🥋 Chuck mówi: {joke}")
-            except Exception as zart_error:
-                print("❌ Żart error:", zart_error)
-                wyslij_wiadomosc("Nie udało się pobrać żartu 😢")
+                joke_resp = requests.get("https://api.chucknorris.io/jokes/random", timeout=5)
+                joke_resp.raise_for_status()
+                joke = joke_resp.json().get("value", "")
+                send_message(f"🥋 Chuck mówi: {joke}")
+            except Exception as joke_error:
+                print("❌ Błąd żartu:", joke_error)
+                send_message("Nie udało się pobrać żartu 😢")
 
-        elif wiadomosc == "!kot":
+        elif message == "!kot":
             try:
-                res = requests.get("https://api.thecatapi.com/v1/images/search", timeout=5)
-                res.raise_for_status()
-                kotek = res.json()[0].get("url", "")
-                wyslij_wiadomosc(f"Kotek: {kotek}")
-            except Exception as kot_error:
-                print("🐱 Błąd kota:", kot_error)
-                wyslij_wiadomosc("Nie udało się pobrać kotka 🐾")
+                cat_resp = requests.get("https://api.thecatapi.com/v1/images/search", timeout=5)
+                cat_resp.raise_for_status()
+                url = cat_resp.json()[0].get("url", "")
+                send_message(f"Kotek: {url}")
+            except Exception as cat_error:
+                print("🐱 Błąd kota:", cat_error)
+                send_message("Nie udało się pobrać kotka 🐾")
 
-        elif wiadomosc == "!boo":
-            if czy_admin(tags_part):
-                play_remote_audio("boo")
-                wyslij_wiadomosc("💥 Puszczam BOO z GitHuba!")
+        elif message in ("!boo", "!ding"):
+            if is_admin(tags_part):
+                sound_id = message.lstrip("!")
+                update_now_playing(sound_id)
+                send_message(f"🎵 Puszczam dźwięk `{sound_id}`!")
             else:
-                wyslij_wiadomosc(f"Sorry {uzytkownik}, to komenda tylko dla admina.")
+                send_message(f"Sorry {sender}, tylko admin może uruchamiać dźwięki!")

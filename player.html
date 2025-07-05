@@ -1,20 +1,30 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <meta charset="utf-8">
-    <title>Sound Player</title>
-  </head>
-  <body style="margin:0; background:transparent;">
-    <audio id="soundPlayer" autoplay></audio>
+<head>
+  <meta charset="utf-8">
+  <title>Sound Player</title>
+</head>
+<body style="margin:0; background:transparent;">
+  <audio id="soundPlayer" autoplay></audio>
 
-    <script>
-      const params = new URLSearchParams(window.location.search);
-      const sound = params.get('sound');
-      const audio = document.getElementById('soundPlayer');
-      if (sound) {
-        audio.src = `https://piekarzone.github.io/sounds/${sound}.mp3`; // <-- dostosuj URL
-        audio.play();
+  <script>
+    let lastSound = "";
+    async function checkAndPlay() {
+      try {
+        const resp = await fetch("now_playing.json", {cache: "no-store"});
+        const obj = await resp.json();
+        const sound = obj.sound;
+        if (sound && sound !== lastSound) {
+          lastSound = sound;
+          const audio = document.getElementById("soundPlayer");
+          audio.src = `sounds/${sound}.mp3`;
+          await audio.play();
+        }
+      } catch (err) {
+        console.error("Fetch error:", err);
       }
-    </script>
-  </body>
+    }
+    setInterval(checkAndPlay, 1000);
+  </script>
+</body>
 </html>
