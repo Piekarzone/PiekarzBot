@@ -2,54 +2,70 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Sound Player</title>
+  <title>WebAudio Sound Player</title>
   <style>
-    html, body { margin:0; background:transparent; overflow:hidden; }
+    html, body { margin:0; background:transparent; overflow:hidden }
     #overlay {
-      position: absolute; top:0; left:0; width:100%; height:100%;
-      background: rgba(0,0,0,0.5); color: white; display:flex;
-      align-items: center; justify-content: center; cursor:pointer;
-      font-family: sans-serif; font-size: 18px;
+      position:absolute; top:0; left:0; width:100%; height:100%;
+      background:rgba(0,0,0,0.5); color:#fff;
+      display:flex; align-items:center; justify-content:center;
+      font-family:sans-serif; font-size:18px; cursor:pointer;
     }
   </style>
 </head>
 <body>
   <div id="overlay">Kliknij, aby odblokować dźwięk</div>
-  <audio id="player" autoplay muted></audio>
 
   <script>
-    const BASE     = "https://piekarzone.github.io/PiekarzBot";
-    const JSON_URL = `${BASE}/now_playing.json`;
-    let lastTs = 0;
-    const overlay = document.getElementById("overlay");
-    const audio   = document.getElementById("player");
+    // Bazowy URL strony GitHub Pages
+    const BASE_URL = "https://piekarzone.github.io/PiekarzBot";
+    const JSON_URL = `${BASE_URL}/now_playing.json`;
 
-    // 1) Gdy klikniesz overlay, odblokujemy autoplay
-    overlay.addEventListener("click", () => {
-      audio.muted = false;
-      audio.play().catch(()=>{});  // odblokuj context
+    // Web Audio
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    let unlocked = false;
+    let lastTs = 0;
+
+    // overlay do odblokowania audioContext
+    const overlay = document.getElementById("overlay");
+    overlay.addEventListener("click", async () => {
+      if (audioCtx.state === "suspended") {
+        await audioCtx.resume();
+      }
+      unlocked = true;
       overlay.remove();
     });
 
-    // 2) Poll JSON i odtwarzaj dźwięk przy każdym nowym ts
+    // odtwarzanie pliku przez AudioContext
+    async function playSound(name, ts) {
+      const url = `${BASE_URL}/sounds/${name}.mp3?_=${ts}`;
+      const resp = await fetch(url);
+      const buf = await resp.arrayBuffer();
+      const audioBuf = await audioCtx.decodeAudioData(buf);
+      const src = audioCtx.createBufferSource();
+      src.buffer = audioBuf;
+      src.connect(audioCtx.destination);
+      src.start(0);
+    }
+
+    // polling JSON
     async function poll() {
+      if (!unlocked) return;
       try {
         const res = await fetch(JSON_URL, { cache: "no-store" });
         const { sound, ts } = await res.json();
         if (ts && ts > lastTs) {
           lastTs = ts;
-          let name = sound.endsWith(".mp3")
-            ? sound.slice(0, -4)
-            : sound;
-          audio.src = `${BASE}/sounds/${name}.mp3?_=${ts}`;
-          audio.load();
-          audio.play().catch(e => console.error("play error:", e));
+          // obcinamy .mp3 jeśli JSON poda pełną nazwę
+          const name = sound.endsWith(".mp3") ? sound.slice(0,-4) : sound;
+          playSound(name, ts);
         }
-      } catch (e) {
+      } catch(e) {
         console.error("Poll error:", e);
       }
     }
 
+    // start pollingu
     setInterval(poll, 1000);
   </script>
 </body>
