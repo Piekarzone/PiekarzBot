@@ -46,12 +46,12 @@
 
     async function poll() {
       try {
-        const res = await fetch(JSON_URL + "?_=" + Date.now(), { cache: "no-store" });
+        const res = await fetch(JSON_URL);
         if (!res.ok) return;
         const { sound, ts } = await res.json();
         if (ts && ts > lastTs) {
           lastTs = ts;
-          audio.src = `${SOUND_BASE}/${sound}.mp3?_=${Date.now()}`;
+          audio.src = `${SOUND_BASE}/${sound}.mp3`;
           audio.load();
           audio.play().catch(e => console.error("play error:", e));
         }
@@ -61,7 +61,7 @@
     }
 
     window.addEventListener("load", ()=>{
-      setInterval(poll, 250); // częstszy polling
+      setInterval(poll, 500);
     });
   </script>
 </body>

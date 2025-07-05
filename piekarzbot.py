@@ -41,9 +41,8 @@ def update_now_playing(sound_id: str):
     raw     = json.dumps(payload, separators=(",",":")).encode("utf-8")
     b64     = base64.b64encode(raw).decode("utf-8")
 
-    # Dodany timestamp w message – wymusza szybszy deploy na GitHub Pages
     body = {
-        "message": f"now_playing → {sound_id} [{int(time.time())}]",
+        "message": f"now_playing → {sound_id}",
         "content": b64,
         "sha": sha
     }
