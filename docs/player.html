@@ -8,23 +8,25 @@
   <audio id="soundPlayer" autoplay></audio>
 
   <script>
-    let lastSound = "";
-    async function checkAndPlay() {
+    const JSON_URL = "now_playing.json";
+    let lastTs = 0;
+
+    async function poll() {
       try {
-        const resp = await fetch("now_playing.json", {cache: "no-store"});
-        const obj = await resp.json();
-        const sound = obj.sound;
-        if (sound && sound !== lastSound) {
-          lastSound = sound;
+        const res = await fetch(JSON_URL, { cache: "no-store" });
+        const obj = await res.json();
+        if (obj.ts && obj.ts > lastTs) {
+          lastTs = obj.ts;
           const audio = document.getElementById("soundPlayer");
-          audio.src = `sounds/${sound}.mp3`;
+          audio.src = `sounds/${obj.sound}.mp3`;
           await audio.play();
         }
-      } catch (err) {
-        console.error("Fetch error:", err);
+      } catch (e) {
+        console.error("Poll error:", e);
       }
     }
-    setInterval(checkAndPlay, 1000);
+
+    setInterval(poll, 1000);
   </script>
 </body>
 </html>

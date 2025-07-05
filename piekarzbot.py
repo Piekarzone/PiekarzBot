@@ -2,59 +2,65 @@ import os
 import socket
 import json
 import base64
+import time
 import requests
 from dotenv import load_dotenv
 
-# 1. Załaduj zmienne środowiskowe z .env
+# 1. Załaduj zmienne środowiskowe
 load_dotenv()
 
 TWITCH_SERVER  = "irc.chat.twitch.tv"
 TWITCH_PORT    = 6667
-TWITCH_TOKEN   = os.getenv("TWITCH_TOKEN")           # oauth:xxxxxx
+TWITCH_TOKEN   = os.getenv("TWITCH_TOKEN")           # oauth:xxxx
 TWITCH_NICK    = os.getenv("TWITCH_NICK")            # piekarzonebot
 TWITCH_CHANNEL = os.getenv("TWITCH_CHANNEL").lower() # piekarzone_
 CHANNEL        = f"#{TWITCH_CHANNEL}"
 
-GITHUB_TOKEN   = os.getenv("GITHUB_TOKEN")
+GITHUB_TOKEN   = os.getenv("GITHUB_TOKEN")           # ghp_xxxx
 GITHUB_REPO    = os.getenv("GITHUB_REPO")            # piekarzone/PiekarzBot
-
 HEADERS = {
     "Authorization": f"token {GITHUB_TOKEN}",
-    "Accept": "application/vnd.github.v3+json"
+    "Accept":        "application/vnd.github.v3+json"
 }
 
-# 2. Lista komend czatowych
+# Lista komend
 komendy = {
     "!hello": "Przywitanie",
-    "!help": "Lista komend",
-    "!zart": "Żart Chucka Norrisa",
-    "!kot": "Losowy kotek",
-    "!boo": "Dźwięk BOO",
-    "!ding": "Dźwięk DING"
+    "!help":  "Lista komend",
+    "!zart":  "Losowy żart Chucka Norrisa",
+    "!kot":   "Losowy kotek",
+    "!boo":   "Dźwięk BOO",
+    "!ding":  "Dźwięk DING"
 }
 
 def update_now_playing(sound_id: str):
     """
-    Aktualizuje now_playing.json w repo, by player.html odtworzył dźwięk.
+    Aktualizuje docs/now_playing.json w repozytorium,
+    dodając pole 'sound' i aktualny timestamp 'ts'.
     """
-    path = "docs/now_playing.json"
+    path    = "docs/now_playing.json"
     api_url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{path}"
 
-    response = requests.get(api_url, headers=HEADERS)
-    response.raise_for_status()
-    sha = response.json()["sha"]
+    # Pobierz bieżącą wersję pliku, by mieć sha
+    resp = requests.get(api_url, headers=HEADERS)
+    resp.raise_for_status()
+    sha = resp.json()["sha"]
 
-    content_json = json.dumps({"sound": sound_id}, separators=(",", ":"))
-    content_b64 = base64.b64encode(content_json.encode("utf-8")).decode("utf-8")
+    # Przygotuj nowe dane z timestampem
+    content = {
+        "sound": sound_id,
+        "ts": int(time.time())
+    }
+    raw       = json.dumps(content, separators=(",",":")).encode("utf-8")
+    b64       = base64.b64encode(raw).decode("utf-8")
 
     payload = {
         "message": f"now_playing → {sound_id}",
-        "content": content_b64,
+        "content": b64,
         "sha": sha
     }
-
-    update = requests.put(api_url, headers=HEADERS, json=payload)
-    update.raise_for_status()
+    resp_put = requests.put(api_url, headers=HEADERS, json=payload)
+    resp_put.raise_for_status()
 
 def send_message(text: str):
     sock.send(f"PRIVMSG {CHANNEL} :{text}\r\n".encode("utf-8"))
@@ -63,13 +69,12 @@ def is_admin(tags_line: str) -> bool:
     if not tags_line:
         return False
     parsed = dict(item.split("=",1) for item in tags_line.split(";") if "=" in item)
-    badges = parsed.get("badges", "")
+    badges = parsed.get("badges","")
     return "broadcaster" in badges or "moderator" in badges
 
-# 3. Połączenie z IRC
+# Połączenie z Twitch IRC
 sock = socket.socket()
 sock.connect((TWITCH_SERVER, TWITCH_PORT))
-
 for cmd in (
     f"PASS {TWITCH_TOKEN}",
     f"NICK {TWITCH_NICK}",
@@ -80,7 +85,7 @@ for cmd in (
 ):
     sock.send((cmd + "\r\n").encode("utf-8"))
 
-# 4. Inicjalne potwierdzenie
+# Czekaj na potwierdzenie 001 (welcome)
 while True:
     line = sock.recv(1024).decode("utf-8", errors="ignore")
     if line.startswith("PING"):
@@ -89,46 +94,42 @@ while True:
         send_message("🍞 Piekarzonebot gotowy!")
         break
 
-# 5. Pętla główna
+# Główna pętla obsługi czatu
 while True:
     data = sock.recv(2048).decode("utf-8", errors="ignore")
     for raw in data.split("\r\n"):
         if not raw:
             continue
-
         if raw.startswith("PING"):
             sock.send("PONG :tmi.twitch.tv\r\n".encode("utf-8"))
             continue
-
         if " PRIVMSG " not in raw:
             continue
 
+        # Rozdziel tagi i resztę
         if raw.startswith("@"):
-            tags_part, rest = raw.split(" ", 1)
+            tags, rest = raw.split(" ",1)
         else:
-            tags_part, rest = "", raw
+            tags, rest = "", raw
 
-        parts = rest.split(" ", 3)
+        parts = rest.split(" ",3)
         if len(parts) < 4:
             continue
-
         prefix, _, _, trailing = parts
         message = trailing.lstrip(":").strip()
-        user = prefix.lstrip(":").split("!")[0].lower()
+        user    = prefix.lstrip(":").split("!")[0].lower()
 
-        # Komendy
         if message == "!hello":
             send_message(f"Hej {user}, tu Piekarzonebot! 🥖")
 
         elif message == "!help":
-            send_message("Komendy: " + "; ".join(f"{k} – {v}" for k, v in komendy.items()))
+            send_message("Komendy: " + "; ".join(f"{k} – {v}" for k,v in komendy.items()))
 
         elif message == "!zart":
             try:
                 r = requests.get("https://api.chucknorris.io/jokes/random", timeout=5)
                 r.raise_for_status()
-                joke = r.json().get("value", "")
-                send_message(f"🥋 Chuck mówi: {joke}")
+                send_message(f"🥋 {r.json().get('value','')}")
             except:
                 send_message("😢 Nie udało się pobrać żartu")
 
@@ -136,13 +137,12 @@ while True:
             try:
                 r = requests.get("https://api.thecatapi.com/v1/images/search", timeout=5)
                 r.raise_for_status()
-                url = r.json()[0].get("url", "")
-                send_message(f"🐱 Kotek: {url}")
+                send_message(f"🐱 {r.json()[0].get('url','')}")
             except:
                 send_message("😿 Nie udało się pobrać kotka")
 
-        elif message in ("!boo", "!ding"):
-            if is_admin(tags_part):
+        elif message in ("!boo","!ding"):
+            if is_admin(tags):
                 update_now_playing(message.lstrip("!"))
                 send_message(f"🎵 Puszczam dźwięk `{message[1:]}`!")
             else:
