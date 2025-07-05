@@ -22,12 +22,12 @@ HEADERS = {
 }
 
 komendy = {
-    "!hello": "Przywitanie",
-    "!help":  "Lista komend",
-    "!zart":  "Losowy żart Chucka Norrisa",
-    "!kot":   "Losowy kotek",
-    "!boo":   "Dźwięk BOO",
-    "!ding":  "Dźwięk DING"
+    "!hello":    "Przywitanie",
+    "!help":     "Lista komend",
+    "!zart":     "Losowy żart Chucka Norrisa",
+    "!kot":      "Losowy kotek",
+    "!wyznanie": "Dźwięk WYZNANIE",
+    "!ding":     "Dźwięk DING"
 }
 
 def update_now_playing(sound_id: str):
@@ -124,10 +124,10 @@ while True:
             except:
                 send_message("😿 Nie udało się pobrać kotka")
 
-        elif message in ("!boo", "!ding"):
+        elif message in ("!wyznanie", "!ding"):
             if is_admin(tags):
-                sound = message.lstrip("!")
-                update_now_playing(sound)
+                sound = "wyznanie.mp3" if message == "!wyznanie" else "ding.mp3"
+                update_now_playing(sound.replace(".mp3", ""))
                 send_message(f"🎵 Puszczam dźwięk `{sound}`!")
             else:
                 send_message(f"Sorry {user}, tylko admin może puszczać dźwięki.")
