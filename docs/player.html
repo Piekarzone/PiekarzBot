@@ -31,37 +31,27 @@
   <audio id="player" autoplay muted></audio>
 
   <script>
-    // 1) Źródło natychmiastowego JSON-a
-    const JSON_URL = 
-      "https://raw.githubusercontent.com/piekarzone/PiekarzBot/main/docs/now_playing.json";
-    const SOUND_BASE = 
-      "https://piekarzone.github.io/PiekarzBot/sounds"; // pliki mp3
+    const JSON_URL = "https://raw.githubusercontent.com/piekarzone/PiekarzBot/main/docs/now_playing.json";
+    const SOUND_BASE = "https://piekarzone.github.io/PiekarzBot/sounds";
 
     let lastTs = 0;
     const btn   = document.getElementById("unlock-btn");
     const audio = document.getElementById("player");
 
-    // Odblokowanie autoplay jednym kliknięciem
     btn.addEventListener("click", ()=>{
       audio.muted = false;
       audio.play().catch(()=>{});
       btn.remove();
     });
 
-    // Polling JSON-a co 500 ms
     async function poll() {
       try {
-        const res = await fetch(JSON_URL, { cache:"no-store" });
+        const res = await fetch(JSON_URL + "?_=" + Date.now(), { cache: "no-store" });
         if (!res.ok) return;
         const { sound, ts } = await res.json();
         if (ts && ts > lastTs) {
           lastTs = ts;
-          // usuń ewentualne ".mp3" z nazwy
-          const name = sound.endsWith(".mp3") 
-            ? sound.slice(0,-4) 
-            : sound;
-          // źródło dźwięku bezpośrednio z GitHub Pages
-          audio.src = `${SOUND_BASE}/${name}.mp3?_=${Date.now()}`;
+          audio.src = `${SOUND_BASE}/${sound}.mp3?_=${Date.now()}`;
           audio.load();
           audio.play().catch(e => console.error("play error:", e));
         }
@@ -71,7 +61,7 @@
     }
 
     window.addEventListener("load", ()=>{
-      setInterval(poll, 500);
+      setInterval(poll, 250); // częstszy polling
     });
   </script>
 </body>

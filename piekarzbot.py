@@ -41,7 +41,12 @@ def update_now_playing(sound_id: str):
     raw     = json.dumps(payload, separators=(",",":")).encode("utf-8")
     b64     = base64.b64encode(raw).decode("utf-8")
 
-    body = {"message": f"now_playing → {sound_id}", "content": b64, "sha": sha}
+    # Dodany timestamp w message – wymusza szybszy deploy na GitHub Pages
+    body = {
+        "message": f"now_playing → {sound_id} [{int(time.time())}]",
+        "content": b64,
+        "sha": sha
+    }
     r2 = requests.put(api_url, headers=HEADERS, json=body)
     r2.raise_for_status()
 
@@ -52,7 +57,7 @@ def is_admin(tags_line: str) -> bool:
     if not tags_line:
         return False
     parsed = dict(item.split("=",1) for item in tags_line.split(";") if "=" in item)
-    badges = parsed.get("badges","")
+    badges = parsed.get("badges", "")
     return "broadcaster" in badges or "moderator" in badges
 
 # Połączenie z IRC
@@ -126,8 +131,8 @@ while True:
 
         elif message in ("!wyznanie", "!ding"):
             if is_admin(tags):
-                sound = "wyznanie.mp3" if message == "!wyznanie" else "ding.mp3"
-                update_now_playing(sound.replace(".mp3", ""))
+                sound = "wyznanie" if message == "!wyznanie" else "ding"
+                update_now_playing(sound)
                 send_message(f"🎵 Puszczam dźwięk `{sound}`!")
             else:
-                send_message(f"Sorry {user}, tylko admin może puszczać dźwięki.")
+                send_message(f"⚠️ Sorry {user}, tylko admin może puszczać dźwięki.")
