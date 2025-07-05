@@ -2,50 +2,54 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Debug Player</title>
-  <style>body{margin:0;background:transparent}</style>
+  <title>Sound Player</title>
+  <style>
+    html, body { margin:0; background:transparent; overflow:hidden; }
+    #overlay {
+      position: absolute; top:0; left:0; width:100%; height:100%;
+      background: rgba(0,0,0,0.5); color: white; display:flex;
+      align-items: center; justify-content: center; cursor:pointer;
+      font-family: sans-serif; font-size: 18px;
+    }
+  </style>
 </head>
 <body>
-  <audio id="player" autoplay></audio>
+  <div id="overlay">Kliknij, aby odblokować dźwięk</div>
+  <audio id="player" autoplay muted></audio>
+
   <script>
     const BASE     = "https://piekarzone.github.io/PiekarzBot";
     const JSON_URL = `${BASE}/now_playing.json`;
     let lastTs = 0;
+    const overlay = document.getElementById("overlay");
+    const audio   = document.getElementById("player");
 
+    // 1) Gdy klikniesz overlay, odblokujemy autoplay
+    overlay.addEventListener("click", () => {
+      audio.muted = false;
+      audio.play().catch(()=>{});  // odblokuj context
+      overlay.remove();
+    });
+
+    // 2) Poll JSON i odtwarzaj dźwięk przy każdym nowym ts
     async function poll() {
       try {
-        console.log("[player] fetching JSON…");
         const res = await fetch(JSON_URL, { cache: "no-store" });
-        const obj = await res.json();
-        console.log("[player] got JSON:", obj);
-        const { sound, ts } = obj;
-
+        const { sound, ts } = await res.json();
         if (ts && ts > lastTs) {
-          console.log(`[player] new ts ${ts} > lastTs ${lastTs}, odtwarzam ${sound}`);
           lastTs = ts;
-
-          // obetnij .mp3 jeśli trzeba
-          const name = sound.endsWith(".mp3")
+          let name = sound.endsWith(".mp3")
             ? sound.slice(0, -4)
             : sound;
-
-          const a = document.getElementById("player");
-          const src = `${BASE}/sounds/${name}.mp3?_=${ts}`;
-          console.log("[player] setting src =", src);
-          a.src = src;
-          a.load();
-          const playPromise = a.play();
-          if (playPromise) {
-            playPromise.then(()=> console.log("[player] play succeeded"))
-                       .catch(e=> console.error("[player] play error:", e));
-          }
+          audio.src = `${BASE}/sounds/${name}.mp3?_=${ts}`;
+          audio.load();
+          audio.play().catch(e => console.error("play error:", e));
         }
       } catch (e) {
-        console.error("[player] poll error:", e);
+        console.error("Poll error:", e);
       }
     }
 
-    // poll co sekundę
     setInterval(poll, 1000);
   </script>
 </body>
