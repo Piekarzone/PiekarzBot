@@ -5,21 +5,23 @@
   <title>Sound Player</title>
 </head>
 <body style="margin:0; background:transparent;">
-  <audio id="soundPlayer" autoplay></audio>
-
+  <audio id="player" autoplay></audio>
   <script>
-    const JSON_URL = "now_playing.json";
+    const BASE = "https://piekarzone.github.io/PiekarzBot";
+    const JSON_URL = `${BASE}/now_playing.json`;
     let lastTs = 0;
 
     async function poll() {
       try {
         const res = await fetch(JSON_URL, { cache: "no-store" });
-        const obj = await res.json();
-        if (obj.ts && obj.ts > lastTs) {
-          lastTs = obj.ts;
-          const audio = document.getElementById("soundPlayer");
-          audio.src = `sounds/${obj.sound}.mp3`;
-          await audio.play();
+        const { sound, ts } = await res.json();
+        if (ts && ts > lastTs) {
+          lastTs = ts;
+          const a = document.getElementById("player");
+          // query-param wymusza przeładowanie pliku nawet przy tym samym URL
+          a.src = `${BASE}/sounds/${sound}.mp3?_=${ts}`;
+          a.load();
+          a.play();
         }
       } catch (e) {
         console.error("Poll error:", e);
