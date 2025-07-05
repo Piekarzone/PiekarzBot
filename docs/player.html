@@ -2,44 +2,50 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Sound Player</title>
+  <title>Debug Player</title>
   <style>body{margin:0;background:transparent}</style>
 </head>
 <body>
   <audio id="player" autoplay></audio>
   <script>
-    // Bazowy URL Twojej strony GitHub Pages
     const BASE     = "https://piekarzone.github.io/PiekarzBot";
     const JSON_URL = `${BASE}/now_playing.json`;
     let lastTs = 0;
 
     async function poll() {
       try {
+        console.log("[player] fetching JSON…");
         const res = await fetch(JSON_URL, { cache: "no-store" });
         const obj = await res.json();
+        console.log("[player] got JSON:", obj);
         const { sound, ts } = obj;
 
-        // Jeśli pojawił się nowy timestamp – odtwarzamy
         if (ts && ts > lastTs) {
+          console.log(`[player] new ts ${ts} > lastTs ${lastTs}, odtwarzam ${sound}`);
           lastTs = ts;
 
-          // Jeśli JSON zawiera "boo.mp3", obcinamy końcówkę
-          let name = sound.endsWith(".mp3")
+          // obetnij .mp3 jeśli trzeba
+          const name = sound.endsWith(".mp3")
             ? sound.slice(0, -4)
             : sound;
 
-          const audio = document.getElementById("player");
-          // Dodajemy query-param, by wymusić nowy fetch pliku
-          audio.src = `${BASE}/sounds/${name}.mp3?_=${ts}`;
-          audio.load();
-          audio.play();
+          const a = document.getElementById("player");
+          const src = `${BASE}/sounds/${name}.mp3?_=${ts}`;
+          console.log("[player] setting src =", src);
+          a.src = src;
+          a.load();
+          const playPromise = a.play();
+          if (playPromise) {
+            playPromise.then(()=> console.log("[player] play succeeded"))
+                       .catch(e=> console.error("[player] play error:", e));
+          }
         }
       } catch (e) {
-        console.error("Poll error:", e);
+        console.error("[player] poll error:", e);
       }
     }
 
-    // Poll co sekundę
+    // poll co sekundę
     setInterval(poll, 1000);
   </script>
 </body>

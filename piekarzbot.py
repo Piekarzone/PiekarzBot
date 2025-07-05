@@ -6,24 +6,21 @@ import time
 import requests
 from dotenv import load_dotenv
 
-# 1. Załaduj zmienne środowiskowe
 load_dotenv()
-
 TWITCH_SERVER  = "irc.chat.twitch.tv"
 TWITCH_PORT    = 6667
-TWITCH_TOKEN   = os.getenv("TWITCH_TOKEN")           # oauth:...
-TWITCH_NICK    = os.getenv("TWITCH_NICK")            # piekarzonebot
-TWITCH_CHANNEL = os.getenv("TWITCH_CHANNEL").lower() # piekarzone_
+TWITCH_TOKEN   = os.getenv("TWITCH_TOKEN")
+TWITCH_NICK    = os.getenv("TWITCH_NICK")
+TWITCH_CHANNEL = os.getenv("TWITCH_CHANNEL").lower()
 CHANNEL        = f"#{TWITCH_CHANNEL}"
 
-GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")             # ghp_...
-GITHUB_REPO  = os.getenv("GITHUB_REPO")              # piekarzone/PiekarzBot
+GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
+GITHUB_REPO  = os.getenv("GITHUB_REPO")
 HEADERS = {
     "Authorization": f"token {GITHUB_TOKEN}",
     "Accept":        "application/vnd.github.v3+json"
 }
 
-# 2. Lista dostępnych komend (tylko do !help)
 komendy = {
     "!hello": "Przywitanie",
     "!help":  "Lista komend",
@@ -34,50 +31,31 @@ komendy = {
 }
 
 def update_now_playing(sound_id: str):
-    """
-    Aktualizuje docs/now_playing.json w repozytorium,
-    zapisując 'sound' oraz 'ts' (timestamp).
-    """
     path    = "docs/now_playing.json"
     api_url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{path}"
 
-    # Pobierz bieżące SHA pliku
-    r1 = requests.get(api_url, headers=HEADERS)
-    r1.raise_for_status()
+    r1 = requests.get(api_url, headers=HEADERS); r1.raise_for_status()
     sha = r1.json()["sha"]
 
-    # Przygotuj nowy JSON z opcją dźwięku i timestampem
-    payload_dict = {
-        "sound": sound_id,
-        "ts": int(time.time())
-    }
-    raw = json.dumps(payload_dict, separators=(",",":")).encode("utf-8")
-    b64 = base64.b64encode(raw).decode("utf-8")
+    payload = {"sound": sound_id, "ts": int(time.time())}
+    raw     = json.dumps(payload, separators=(",",":")).encode("utf-8")
+    b64     = base64.b64encode(raw).decode("utf-8")
 
-    body = {
-        "message": f"now_playing → {sound_id}",
-        "content": b64,
-        "sha": sha
-    }
+    body = {"message": f"now_playing → {sound_id}", "content": b64, "sha": sha}
     r2 = requests.put(api_url, headers=HEADERS, json=body)
     r2.raise_for_status()
 
 def send_message(text: str):
-    """Wyślij wiadomość na czacie Twitch."""
     sock.send(f"PRIVMSG {CHANNEL} :{text}\r\n".encode("utf-8"))
 
 def is_admin(tags_line: str) -> bool:
-    """
-    Z tagów IRC wybiera pole 'badges' i sprawdza,
-    czy jest moderator lub broadcaster.
-    """
     if not tags_line:
         return False
     parsed = dict(item.split("=",1) for item in tags_line.split(";") if "=" in item)
-    badges = parsed.get("badges", "")
+    badges = parsed.get("badges","")
     return "broadcaster" in badges or "moderator" in badges
 
-# 3. Łączenie z IRC Twitch
+# Połączenie z IRC
 sock = socket.socket()
 sock.connect((TWITCH_SERVER, TWITCH_PORT))
 for cmd in (
@@ -90,7 +68,7 @@ for cmd in (
 ):
     sock.send((cmd + "\r\n").encode("utf-8"))
 
-# 4. Czekaj na potwierdzenie 001 (Welcome)
+# Powitanie (001)
 while True:
     line = sock.recv(1024).decode("utf-8", errors="ignore")
     if line.startswith("PING"):
@@ -99,7 +77,7 @@ while True:
         send_message("🍞 Piekarzonebot gotowy!")
         break
 
-# 5. Główna pętla obsługi czatu
+# Obsługa czatu
 while True:
     data = sock.recv(2048).decode("utf-8", errors="ignore")
     for raw in data.split("\r\n"):
@@ -111,33 +89,30 @@ while True:
         if " PRIVMSG " not in raw:
             continue
 
-        # Rozdziel tagi IRC od reszty
         if raw.startswith("@"):
-            tags, rest = raw.split(" ", 1)
+            tags, rest = raw.split(" ",1)
         else:
             tags, rest = "", raw
 
-        parts = rest.split(" ", 3)
+        parts = rest.split(" ",3)
         if len(parts) < 4:
             continue
         prefix, _, _, trailing = parts
         message = trailing.lstrip(":").strip()
         user    = prefix.lstrip(":").split("!")[0].lower()
 
-        # Obsługa komend
         if message == "!hello":
             send_message(f"Hej {user}, tu Piekarzonebot! 🥖")
 
         elif message == "!help":
-            txt = "; ".join(f"{k} – {v}" for k, v in komendy.items())
+            txt = "; ".join(f"{k} – {v}" for k,v in komendy.items())
             send_message(f"Komendy: {txt}")
 
         elif message == "!zart":
             try:
                 r = requests.get("https://api.chucknorris.io/jokes/random", timeout=5)
                 r.raise_for_status()
-                joke = r.json().get("value", "")
-                send_message(f"🥋 {joke}")
+                send_message(f"🥋 {r.json().get('value','')}")
             except:
                 send_message("😢 Nie udało się pobrać żartu")
 
@@ -145,15 +120,14 @@ while True:
             try:
                 r = requests.get("https://api.thecatapi.com/v1/images/search", timeout=5)
                 r.raise_for_status()
-                url = r.json()[0].get("url", "")
-                send_message(f"🐱 {url}")
+                send_message(f"🐱 {r.json()[0].get('url','')}")
             except:
                 send_message("😿 Nie udało się pobrać kotka")
 
         elif message in ("!boo", "!ding"):
             if is_admin(tags):
-                sound = message.lstrip("!")         # np. "boo" lub "ding"
-                update_now_playing(sound)           # zapisze sound + ts w JSON
+                sound = message.lstrip("!")
+                update_now_playing(sound)
                 send_message(f"🎵 Puszczam dźwięk `{sound}`!")
             else:
                 send_message(f"Sorry {user}, tylko admin może puszczać dźwięki.")
