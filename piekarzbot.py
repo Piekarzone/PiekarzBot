@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 from flask import Flask
 import threading
 
-# Flask app to keep Render Web Service alive
+# 🍞 Mini serwer HTTP dla Render (nasłuchuje na PORT z Render)
 app = Flask(__name__)
 
 @app.route('/')
@@ -16,12 +16,13 @@ def index():
     return "🍞 PiekarzBot działa 24/7 na Render!"
 
 def run_web():
-    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 8080)))
+    port = int(os.environ.get('PORT', 10000))  # Render przekazuje PORT jako zmienną
+    app.run(host='0.0.0.0', port=port)
 
-# Start the web server in a separate thread
+# Start serwera Flask w osobnym wątku
 threading.Thread(target=run_web).start()
 
-# PiekarzBot IRC logic
+# 🔥 PiekarzBot IRC logic
 load_dotenv()
 TWITCH_SERVER  = "irc.chat.twitch.tv"
 TWITCH_PORT    = 6667
@@ -66,7 +67,7 @@ def update_now_playing(sound_id: str):
     r2.raise_for_status()
 
 def send_message(text: str):
-    sock.send(f"PRIVMSG {CHANNEL} :{text}\r\n".encode("utf-8"))
+    sock.send(f"PRIVMSG {CHANNEL} :{text}\\r\\n".encode("utf-8"))
 
 def is_admin(tags_line: str) -> bool:
     if not tags_line:
@@ -86,13 +87,13 @@ for cmd in (
     "CAP REQ :twitch.tv/membership",
     f"JOIN {CHANNEL}"
 ):
-    sock.send((cmd + "\r\n").encode("utf-8"))
+    sock.send((cmd + "\\r\\n").encode("utf-8"))
 
 # Powitanie (001)
 while True:
     line = sock.recv(1024).decode("utf-8", errors="ignore")
     if line.startswith("PING"):
-        sock.send("PONG :tmi.twitch.tv\r\n".encode("utf-8"))
+        sock.send("PONG :tmi.twitch.tv\\r\\n".encode("utf-8"))
     if " 001 " in line:
         send_message("🍞 Piekarzonebot gotowy!")
         break
@@ -100,11 +101,11 @@ while True:
 # Obsługa czatu
 while True:
     data = sock.recv(2048).decode("utf-8", errors="ignore")
-    for raw in data.split("\r\n"):
+    for raw in data.split("\\r\\n"):
         if not raw:
             continue
         if raw.startswith("PING"):
-            sock.send("PONG :tmi.twitch.tv\r\n".encode("utf-8"))
+            sock.send("PONG :tmi.twitch.tv\\r\\n".encode("utf-8"))
             continue
         if " PRIVMSG " not in raw:
             continue
