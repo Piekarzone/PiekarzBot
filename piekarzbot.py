@@ -4,6 +4,9 @@ import ssl
 import json
 import time
 import requests
+import eventlet
+eventlet.monkey_patch()
+
 from dotenv import load_dotenv
 from flask import Flask, jsonify
 from flask_cors import cross_origin
@@ -12,13 +15,13 @@ import threading
 
 # 🍞 Mini serwer HTTP + WebSocket
 app = Flask(__name__)
-socketio = SocketIO(app, cors_allowed_origins="*")
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode="eventlet")
 
 current_sound = {"sound": "", "ts": 0}
 
 @app.route('/')
 def index():
-    return "🍞 PiekarzBot działa 24/7 z WebSocket!"
+    return "🍞 PiekarzBot działa 24/7 z WebSocket (eventlet)"
 
 @app.route('/now_playing')
 @cross_origin()
@@ -88,7 +91,7 @@ while True:
     if line.startswith("PING"):
         sock.send("PONG :tmi.twitch.tv\r\n".encode("utf-8"))
     if " 001 " in line:
-        send_message("🍞 Piekarzonebot gotowy z WebSocket!")
+        send_message("🍞 Piekarzonebot gotowy z WebSocket (eventlet)!")
         break
 
 # Obsługa czatu
