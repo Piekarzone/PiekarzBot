@@ -1,6 +1,0 @@
-requests
-python-dotenv
-flask
-flask_cors
-flask_socketio
-eventlet
