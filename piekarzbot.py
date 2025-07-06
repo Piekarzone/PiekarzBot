@@ -115,20 +115,12 @@ while True:
             send_message(f"Komendy: {txt}")
 
         elif message == "!zart":
-            try:
-                r = requests.get("https://api.chucknorris.io/jokes/random", timeout=5)
-                r.raise_for_status()
-                send_message(f"🥋 {r.json().get('value','')}")
-            except:
-                send_message("😢 Nie udało się pobrać żartu")
+            update_now_playing("api:joke")
+            send_message("🥋 Pobieram żart...")
 
         elif message == "!kot":
-            try:
-                r = requests.get("https://api.thecatapi.com/v1/images/search", timeout=5)
-                r.raise_for_status()
-                send_message(f"🐱 {r.json()[0].get('url','')}")
-            except:
-                send_message("😿 Nie udało się pobrać kotka")
+            update_now_playing("api:cat")
+            send_message("🐱 Pobieram kotka...")
 
         elif message in ("!wyznanie", "!niestreamer"):
             if is_admin(tags):

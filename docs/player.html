@@ -10,6 +10,7 @@
       background: transparent;
       overflow: hidden;
       font-family: sans-serif;
+      color: #fff;
     }
     #unlock-btn {
       position: absolute;
@@ -24,26 +25,56 @@
       cursor: pointer;
       z-index: 10;
     }
+    #content {
+      position: absolute;
+      bottom: 10px; left: 10px;
+      background: rgba(0,0,0,0.7);
+      padding: 10px;
+      border-radius: 8px;
+      max-width: 90%;
+    }
   </style>
 </head>
 <body>
   <button id="unlock-btn">Odblokuj dźwięk</button>
   <audio id="player" autoplay muted></audio>
+  <div id="content"></div>
 
   <script>
-    const API_URL   = "https://piekarzbot.onrender.com/now_playing"; // Render API
-    const SOUND_URL = "https://piekarzone.github.io/PiekarzBot/sounds"; // folder mp3
+    const API_URL   = "https://piekarzbot.onrender.com/now_playing";
+    const SOUND_URL = "https://piekarzone.github.io/PiekarzBot/sounds";
 
     let lastTs = 0;
-    const btn   = document.getElementById("unlock-btn");
-    const audio = document.getElementById("player");
+    const btn     = document.getElementById("unlock-btn");
+    const audio   = document.getElementById("player");
+    const content = document.getElementById("content");
 
-    // Odblokowanie autoplay
     btn.addEventListener("click", () => {
       audio.muted = false;
       audio.play().catch(() => {});
       btn.remove();
     });
+
+    async function fetchCat() {
+      try {
+        const res = await fetch("https://api.thecatapi.com/v1/images/search");
+        const data = await res.json();
+        const imgUrl = data[0].url;
+        content.innerHTML = `<img src="${imgUrl}" style="max-width:100%; border-radius:8px;">`;
+      } catch (e) {
+        content.textContent = "😿 Nie udało się pobrać kotka";
+      }
+    }
+
+    async function fetchJoke() {
+      try {
+        const res = await fetch("https://api.chucknorris.io/jokes/random");
+        const data = await res.json();
+        content.textContent = `🥋 ${data.value}`;
+      } catch (e) {
+        content.textContent = "😢 Nie udało się pobrać żartu";
+      }
+    }
 
     async function poll() {
       try {
@@ -52,10 +83,16 @@
         const { sound, ts } = await res.json();
         if (ts && ts > lastTs) {
           lastTs = ts;
-          const src = `${SOUND_URL}/${sound}.mp3?_=${Date.now()}`;
-          audio.src = src;
-          audio.load();
-          audio.play().catch(e => console.error("play error:", e));
+          if (sound.startsWith("api:")) {
+            if (sound === "api:cat") fetchCat();
+            if (sound === "api:joke") fetchJoke();
+          } else {
+            const src = `${SOUND_URL}/${sound}.mp3?_=${Date.now()}`;
+            audio.src = src;
+            audio.load();
+            audio.play().catch(e => console.error("play error:", e));
+            content.textContent = "";
+          }
         }
       } catch (e) {
         console.error("poll error:", e);
@@ -63,7 +100,7 @@
     }
 
     window.addEventListener("load", () => {
-      setInterval(poll, 200); // Szybszy polling: co 200 ms
+      setInterval(poll, 200);
     });
   </script>
 </body>
