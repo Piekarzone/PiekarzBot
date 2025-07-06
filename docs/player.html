@@ -5,24 +5,24 @@
   <title>Fast Sound Player</title>
   <style>
     html, body {
-      margin:0; padding:0;
-      width:100%; height:100%;
-      background:transparent;
-      overflow:hidden;
-      font-family:sans-serif;
+      margin: 0; padding: 0;
+      width: 100%; height: 100%;
+      background: transparent;
+      overflow: hidden;
+      font-family: sans-serif;
     }
     #unlock-btn {
-      position:absolute;
-      top:50%; left:50%;
-      transform:translate(-50%,-50%);
-      padding:16px 32px;
-      background:#e74c3c;
-      color:#fff;
-      font-size:18px;
-      border:none;
-      border-radius:4px;
-      cursor:pointer;
-      z-index:10;
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      padding: 16px 32px;
+      background: #e74c3c;
+      color: #fff;
+      font-size: 18px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      z-index: 10;
     }
   </style>
 </head>
@@ -31,37 +31,39 @@
   <audio id="player" autoplay muted></audio>
 
   <script>
-    const JSON_URL = "https://raw.githubusercontent.com/piekarzone/PiekarzBot/main/docs/now_playing.json";
-    const SOUND_BASE = "https://piekarzone.github.io/PiekarzBot/sounds";
+    const API_URL   = "https://piekarzbot.onrender.com/now_playing"; // Render API
+    const SOUND_URL = "https://piekarzone.github.io/PiekarzBot/sounds"; // folder mp3
 
     let lastTs = 0;
     const btn   = document.getElementById("unlock-btn");
     const audio = document.getElementById("player");
 
-    btn.addEventListener("click", ()=>{
+    // Odblokowanie autoplay
+    btn.addEventListener("click", () => {
       audio.muted = false;
-      audio.play().catch(()=>{});
+      audio.play().catch(() => {});
       btn.remove();
     });
 
     async function poll() {
       try {
-        const res = await fetch(JSON_URL);
+        const res = await fetch(API_URL, { cache: "no-store" });
         if (!res.ok) return;
         const { sound, ts } = await res.json();
         if (ts && ts > lastTs) {
           lastTs = ts;
-          audio.src = `${SOUND_BASE}/${sound}.mp3`;
+          const src = `${SOUND_URL}/${sound}.mp3?_=${Date.now()}`;
+          audio.src = src;
           audio.load();
           audio.play().catch(e => console.error("play error:", e));
         }
-      } catch(e) {
+      } catch (e) {
         console.error("poll error:", e);
       }
     }
 
-    window.addEventListener("load", ()=>{
-      setInterval(poll, 500);
+    window.addEventListener("load", () => {
+      setInterval(poll, 200); // Szybszy polling: co 200 ms
     });
   </script>
 </body>

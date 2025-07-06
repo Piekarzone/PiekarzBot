@@ -6,15 +6,21 @@ import base64
 import time
 import requests
 from dotenv import load_dotenv
-from flask import Flask
+from flask import Flask, jsonify
 import threading
 
 # 🍞 Mini serwer HTTP dla Render (nasłuchuje na PORT z Render)
 app = Flask(__name__)
 
+current_sound = {"sound": "", "ts": 0}  # przechowuje aktualny dźwięk
+
 @app.route('/')
 def index():
     return "🍞 PiekarzBot działa 24/7 na Render!"
+
+@app.route('/now_playing')
+def now_playing():
+    return jsonify(current_sound)
 
 def run_web():
     port = int(os.environ.get('PORT', 10000))  # Render przekazuje PORT jako zmienną
@@ -49,6 +55,11 @@ komendy = {
 }
 
 def update_now_playing(sound_id: str):
+    # Aktualizacja zmiennej globalnej dla playera
+    current_sound["sound"] = sound_id
+    current_sound["ts"] = int(time.time())
+
+    # Aktualizacja GitHub (opcjonalnie)
     path    = "docs/now_playing.json"
     api_url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{path}"
 
