@@ -1,5 +1,6 @@
 import os
 import socket
+import ssl
 import json
 import base64
 import time
@@ -25,7 +26,7 @@ threading.Thread(target=run_web).start()
 # 🔥 PiekarzBot IRC logic
 load_dotenv()
 TWITCH_SERVER  = "irc.chat.twitch.tv"
-TWITCH_PORT    = 6667
+TWITCH_PORT    = 6697  # SSL port
 TWITCH_TOKEN   = os.getenv("TWITCH_TOKEN")
 TWITCH_NICK    = os.getenv("TWITCH_NICK")
 TWITCH_CHANNEL = os.getenv("TWITCH_CHANNEL").lower()
@@ -55,7 +56,7 @@ def update_now_playing(sound_id: str):
     sha = r1.json()["sha"]
 
     payload = {"sound": sound_id, "ts": int(time.time())}
-    raw     = json.dumps(payload, separators=(",",":")).encode("utf-8")
+    raw     = json.dumps(payload, separators=(',',':')).encode("utf-8")
     b64     = base64.b64encode(raw).decode("utf-8")
 
     body = {
@@ -67,7 +68,7 @@ def update_now_playing(sound_id: str):
     r2.raise_for_status()
 
 def send_message(text: str):
-    sock.send(f"PRIVMSG {CHANNEL} :{text}\\r\\n".encode("utf-8"))
+    sock.send(f"PRIVMSG {CHANNEL} :{text}\r\n".encode("utf-8"))
 
 def is_admin(tags_line: str) -> bool:
     if not tags_line:
@@ -76,8 +77,9 @@ def is_admin(tags_line: str) -> bool:
     badges = parsed.get("badges", "")
     return "broadcaster" in badges or "moderator" in badges
 
-# Połączenie z IRC
-sock = socket.socket()
+# Połączenie z IRC przez SSL
+context = ssl.create_default_context()
+sock = context.wrap_socket(socket.socket(), server_hostname=TWITCH_SERVER)
 sock.connect((TWITCH_SERVER, TWITCH_PORT))
 for cmd in (
     f"PASS {TWITCH_TOKEN}",
@@ -87,13 +89,13 @@ for cmd in (
     "CAP REQ :twitch.tv/membership",
     f"JOIN {CHANNEL}"
 ):
-    sock.send((cmd + "\\r\\n").encode("utf-8"))
+    sock.send((cmd + "\r\n").encode("utf-8"))
 
 # Powitanie (001)
 while True:
     line = sock.recv(1024).decode("utf-8", errors="ignore")
     if line.startswith("PING"):
-        sock.send("PONG :tmi.twitch.tv\\r\\n".encode("utf-8"))
+        sock.send("PONG :tmi.twitch.tv\r\n".encode("utf-8"))
     if " 001 " in line:
         send_message("🍞 Piekarzonebot gotowy!")
         break
@@ -101,11 +103,11 @@ while True:
 # Obsługa czatu
 while True:
     data = sock.recv(2048).decode("utf-8", errors="ignore")
-    for raw in data.split("\\r\\n"):
+    for raw in data.split("\r\n"):
         if not raw:
             continue
         if raw.startswith("PING"):
-            sock.send("PONG :tmi.twitch.tv\\r\\n".encode("utf-8"))
+            sock.send("PONG :tmi.twitch.tv\r\n".encode("utf-8"))
             continue
         if " PRIVMSG " not in raw:
             continue
