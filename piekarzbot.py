@@ -9,34 +9,26 @@ eventlet.monkey_patch()
 
 from dotenv import load_dotenv
 from flask import Flask, jsonify
-from flask_cors import cross_origin
+from flask_cors import CORS
 from flask_socketio import SocketIO
-import threading
 
-# 🍞 Mini serwer HTTP + WebSocket
+# 🍞 Serwer HTTP + WebSocket
 app = Flask(__name__)
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode="eventlet")
+CORS(app)
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode="eventlet", ping_interval=10, ping_timeout=30)
 
 current_sound = {"sound": "", "ts": 0}
 
 @app.route('/')
 def index():
-    return "🍞 PiekarzBot działa 24/7 z WebSocket (eventlet)"
+    return "🍞 PiekarzBot działa 24/7 z WebSocket (eventlet fallback polling)"
 
 @app.route('/now_playing')
-@cross_origin()
 def now_playing():
     return jsonify(current_sound)
 
 def broadcast_now_playing():
     socketio.emit('now_playing', current_sound)
-
-def run_web():
-    port = int(os.environ.get('PORT', 10000))
-    socketio.run(app, host='0.0.0.0', port=port)
-
-# Start Flask + WebSocket w tle
-threading.Thread(target=run_web).start()
 
 # 🔥 IRC logic
 load_dotenv()
@@ -59,7 +51,7 @@ komendy = {
 def update_now_playing(sound_id: str):
     current_sound["sound"] = sound_id
     current_sound["ts"] = int(time.time())
-    broadcast_now_playing()  # 🔥 powiadom player przez WebSocket
+    broadcast_now_playing()
 
 def send_message(text: str):
     sock.send(f"PRIVMSG {CHANNEL} :{text}\r\n".encode("utf-8"))
@@ -91,7 +83,7 @@ while True:
     if line.startswith("PING"):
         sock.send("PONG :tmi.twitch.tv\r\n".encode("utf-8"))
     if " 001 " in line:
-        send_message("🍞 Piekarzonebot gotowy z WebSocket (eventlet)!")
+        send_message("🍞 Piekarzonebot gotowy z WebSocket!")
         break
 
 # Obsługa czatu
@@ -152,3 +144,8 @@ while True:
                 send_message(f"🎵 Puszczam dźwięk `{sound}`!")
             else:
                 send_message(f"⚠️ Sorry {user}, tylko admin może puszczać dźwięki.")
+
+# Start bezpośredni bez wątku
+if __name__ == "__main__":
+    port = int(os.environ.get('PORT', 10000))
+    socketio.run(app, host='0.0.0.0', port=port)
