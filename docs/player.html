@@ -41,8 +41,8 @@
   <div id="content"></div>
 
   <script>
-    const API_URL   = "https://piekarzbot.onrender.com/now_playing";
-    const SOUND_URL = "https://piekarzone.github.io/PiekarzBot/sounds";
+    const API_URL   = "https://piekarzbot.onrender.com/now_playing"; // Render API
+    const SOUND_URL = "https://piekarzone.github.io/PiekarzBot/sounds"; // folder mp3
 
     let lastTs = 0;
     const btn     = document.getElementById("unlock-btn");
@@ -91,7 +91,7 @@
             audio.src = src;
             audio.load();
             audio.play().catch(e => console.error("play error:", e));
-            content.textContent = "";
+            content.textContent = ""; // czyści koty/żarty przy dźwiękach
           }
         }
       } catch (e) {
@@ -100,7 +100,7 @@
     }
 
     window.addEventListener("load", () => {
-      setInterval(poll, 200);
+      setInterval(poll, 200); // odpytywanie co 200ms
     });
   </script>
 </body>
