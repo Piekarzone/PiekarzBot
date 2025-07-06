@@ -5,10 +5,12 @@ import json
 import time
 from dotenv import load_dotenv
 from flask import Flask, jsonify
+from flask_cors import CORS
 import threading
 
 # 🍞 Mini serwer HTTP dla Render (nasłuchuje na PORT z Render)
 app = Flask(__name__)
+CORS(app)  # 🔥 Dodaj CORS żeby player mógł pytać API
 
 current_sound = {"sound": "", "ts": 0}  # przechowuje aktualny dźwięk
 
