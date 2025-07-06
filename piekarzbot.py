@@ -2,9 +2,7 @@ import os
 import socket
 import ssl
 import json
-import base64
 import time
-import requests
 from dotenv import load_dotenv
 from flask import Flask, jsonify
 import threading
@@ -38,13 +36,6 @@ TWITCH_NICK    = os.getenv("TWITCH_NICK")
 TWITCH_CHANNEL = os.getenv("TWITCH_CHANNEL").lower()
 CHANNEL        = f"#{TWITCH_CHANNEL}"
 
-GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
-GITHUB_REPO  = os.getenv("GITHUB_REPO")
-HEADERS = {
-    "Authorization": f"token {GITHUB_TOKEN}",
-    "Accept":        "application/vnd.github.v3+json"
-}
-
 komendy = {
     "!hello":       "Przywitanie",
     "!help":        "Lista komend",
@@ -58,25 +49,6 @@ def update_now_playing(sound_id: str):
     # Aktualizacja zmiennej globalnej dla playera
     current_sound["sound"] = sound_id
     current_sound["ts"] = int(time.time())
-
-    # Aktualizacja GitHub (opcjonalnie)
-    path    = "docs/now_playing.json"
-    api_url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{path}"
-
-    r1 = requests.get(api_url, headers=HEADERS); r1.raise_for_status()
-    sha = r1.json()["sha"]
-
-    payload = {"sound": sound_id, "ts": int(time.time())}
-    raw     = json.dumps(payload, separators=(',',':')).encode("utf-8")
-    b64     = base64.b64encode(raw).decode("utf-8")
-
-    body = {
-        "message": f"now_playing → {sound_id}",
-        "content": b64,
-        "sha": sha
-    }
-    r2 = requests.put(api_url, headers=HEADERS, json=body)
-    r2.raise_for_status()
 
 def send_message(text: str):
     sock.send(f"PRIVMSG {CHANNEL} :{text}\r\n".encode("utf-8"))
