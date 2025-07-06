@@ -41,10 +41,9 @@
   <div id="content"></div>
 
   <script>
-    const API_URL   = "https://piekarzbot.onrender.com/now_playing"; // Render API
-    const SOUND_URL = "https://piekarzone.github.io/PiekarzBot/sounds"; // folder mp3
+    const WS_URL    = "wss://piekarzbot.onrender.com/socket.io/?EIO=4&transport=websocket";
+    const SOUND_URL = "https://piekarzone.github.io/PiekarzBot/sounds";
 
-    let lastTs = 0;
     const btn     = document.getElementById("unlock-btn");
     const audio   = document.getElementById("player");
     const content = document.getElementById("content");
@@ -55,53 +54,32 @@
       btn.remove();
     });
 
+    const socket = new WebSocket(WS_URL);
+
+    socket.onmessage = async (event) => {
+      let data;
+      try {
+        data = JSON.parse(event.data.split("42")[1]); // socket.io packet fix
+        if (!data || !data[1]) return;
+        const { sound } = data[1];
+      } catch {
+        return;
+      }
+
+      if (sound.startsWith("api:")) {
+        if (sound === "api:cat") fetchCat();
+        if (sound === "api:joke") fetchJoke();
+      } else {
+        const src = `${SOUND_URL}/${sound}.mp3?_=${Date.now()}`;
+        audio.src = src;
+        audio.load();
+        audio.play().catch(e => console.error("play error:", e));
+        content.textContent = ""; // wyczyść kotka/żart
+      }
+    };
+
     async function fetchCat() {
       try {
         const res = await fetch("https://api.thecatapi.com/v1/images/search");
         const data = await res.json();
-        const imgUrl = data[0].url;
-        content.innerHTML = `<img src="${imgUrl}" style="max-width:100%; border-radius:8px;">`;
-      } catch (e) {
-        content.textContent = "😿 Nie udało się pobrać kotka";
-      }
-    }
-
-    async function fetchJoke() {
-      try {
-        const res = await fetch("https://api.chucknorris.io/jokes/random");
-        const data = await res.json();
-        content.textContent = `🥋 ${data.value}`;
-      } catch (e) {
-        content.textContent = "😢 Nie udało się pobrać żartu";
-      }
-    }
-
-    async function poll() {
-      try {
-        const res = await fetch(API_URL, { cache: "no-store" });
-        if (!res.ok) return;
-        const { sound, ts } = await res.json();
-        if (ts && ts > lastTs) {
-          lastTs = ts;
-          if (sound.startsWith("api:")) {
-            if (sound === "api:cat") fetchCat();
-            if (sound === "api:joke") fetchJoke();
-          } else {
-            const src = `${SOUND_URL}/${sound}.mp3?_=${Date.now()}`;
-            audio.src = src;
-            audio.load();
-            audio.play().catch(e => console.error("play error:", e));
-            content.textContent = ""; // czyści koty/żarty przy dźwiękach
-          }
-        }
-      } catch (e) {
-        console.error("poll error:", e);
-      }
-    }
-
-    window.addEventListener("load", () => {
-      setInterval(poll, 200); // odpytywanie co 200ms
-    });
-  </script>
-</body>
-</html>
+        cons

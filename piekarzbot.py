@@ -7,27 +7,32 @@ import requests
 from dotenv import load_dotenv
 from flask import Flask, jsonify
 from flask_cors import cross_origin
+from flask_socketio import SocketIO
 import threading
 
-# 🍞 Mini serwer HTTP dla Render
+# 🍞 Mini serwer HTTP + WebSocket
 app = Flask(__name__)
+socketio = SocketIO(app, cors_allowed_origins="*")
 
 current_sound = {"sound": "", "ts": 0}
 
 @app.route('/')
 def index():
-    return "🍞 PiekarzBot działa 24/7 na Render!"
+    return "🍞 PiekarzBot działa 24/7 z WebSocket!"
 
 @app.route('/now_playing')
 @cross_origin()
 def now_playing():
     return jsonify(current_sound)
 
+def broadcast_now_playing():
+    socketio.emit('now_playing', current_sound)
+
 def run_web():
     port = int(os.environ.get('PORT', 10000))
-    app.run(host='0.0.0.0', port=port)
+    socketio.run(app, host='0.0.0.0', port=port)
 
-# Start Flask w tle
+# Start Flask + WebSocket w tle
 threading.Thread(target=run_web).start()
 
 # 🔥 IRC logic
@@ -51,6 +56,7 @@ komendy = {
 def update_now_playing(sound_id: str):
     current_sound["sound"] = sound_id
     current_sound["ts"] = int(time.time())
+    broadcast_now_playing()  # 🔥 powiadom player przez WebSocket
 
 def send_message(text: str):
     sock.send(f"PRIVMSG {CHANNEL} :{text}\r\n".encode("utf-8"))
@@ -82,7 +88,7 @@ while True:
     if line.startswith("PING"):
         sock.send("PONG :tmi.twitch.tv\r\n".encode("utf-8"))
     if " 001 " in line:
-        send_message("🍞 Piekarzonebot gotowy!")
+        send_message("🍞 Piekarzonebot gotowy z WebSocket!")
         break
 
 # Obsługa czatu
