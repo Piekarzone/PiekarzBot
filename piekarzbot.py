@@ -40,12 +40,12 @@ HEADERS = {
 }
 
 komendy = {
-    "!hello":    "Przywitanie",
-    "!help":     "Lista komend",
-    "!zart":     "Losowy żart Chucka Norrisa",
-    "!kot":      "Losowy kotek",
-    "!wyznanie": "Dźwięk WYZNANIE",
-    "!ding":     "Dźwięk DING"
+    "!hello":       "Przywitanie",
+    "!help":        "Lista komend",
+    "!zart":        "Losowy żart Chucka Norrisa",
+    "!kot":         "Losowy kotek",
+    "!wyznanie":    "Dźwięk WYZNANIE",
+    "!niestreamer": "Dźwięk NIESTREAMER"
 }
 
 def update_now_playing(sound_id: str):
@@ -56,7 +56,7 @@ def update_now_playing(sound_id: str):
     sha = r1.json()["sha"]
 
     payload = {"sound": sound_id, "ts": int(time.time())}
-    raw     = json.dumps(payload, separators=(',',':')).encode("utf-8")
+    raw     = json.dumps(payload, separators=(",",":")).encode("utf-8")
     b64     = base64.b64encode(raw).decode("utf-8")
 
     body = {
@@ -68,7 +68,7 @@ def update_now_playing(sound_id: str):
     r2.raise_for_status()
 
 def send_message(text: str):
-    sock.send(f"PRIVMSG {CHANNEL} :{text}\r\n".encode("utf-8"))
+    sock.send(f"PRIVMSG {CHANNEL} :{text}\\r\\n".encode("utf-8"))
 
 def is_admin(tags_line: str) -> bool:
     if not tags_line:
@@ -89,13 +89,13 @@ for cmd in (
     "CAP REQ :twitch.tv/membership",
     f"JOIN {CHANNEL}"
 ):
-    sock.send((cmd + "\r\n").encode("utf-8"))
+    sock.send((cmd + "\\r\\n").encode("utf-8"))
 
 # Powitanie (001)
 while True:
     line = sock.recv(1024).decode("utf-8", errors="ignore")
     if line.startswith("PING"):
-        sock.send("PONG :tmi.twitch.tv\r\n".encode("utf-8"))
+        sock.send("PONG :tmi.twitch.tv\\r\\n".encode("utf-8"))
     if " 001 " in line:
         send_message("🍞 Piekarzonebot gotowy!")
         break
@@ -103,11 +103,11 @@ while True:
 # Obsługa czatu
 while True:
     data = sock.recv(2048).decode("utf-8", errors="ignore")
-    for raw in data.split("\r\n"):
+    for raw in data.split("\\r\\n"):
         if not raw:
             continue
         if raw.startswith("PING"):
-            sock.send("PONG :tmi.twitch.tv\r\n".encode("utf-8"))
+            sock.send("PONG :tmi.twitch.tv\\r\\n".encode("utf-8"))
             continue
         if " PRIVMSG " not in raw:
             continue
@@ -147,9 +147,9 @@ while True:
             except:
                 send_message("😿 Nie udało się pobrać kotka")
 
-        elif message in ("!wyznanie", "!ding"):
+        elif message in ("!wyznanie", "!niestreamer"):
             if is_admin(tags):
-                sound = "wyznanie" if message == "!wyznanie" else "ding"
+                sound = "wyznanie" if message == "!wyznanie" else "niestreamer"
                 update_now_playing(sound)
                 send_message(f"🎵 Puszczam dźwięk `{sound}`!")
             else:
