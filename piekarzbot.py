@@ -3,36 +3,37 @@ import socket
 import ssl
 import json
 import time
+import requests
 from dotenv import load_dotenv
 from flask import Flask, jsonify
-from flask_cors import CORS
+from flask_cors import cross_origin
 import threading
 
-# 🍞 Mini serwer HTTP dla Render (nasłuchuje na PORT z Render)
+# 🍞 Mini serwer HTTP dla Render
 app = Flask(__name__)
-CORS(app)  # 🔥 Dodaj CORS żeby player mógł pytać API
 
-current_sound = {"sound": "", "ts": 0}  # przechowuje aktualny dźwięk
+current_sound = {"sound": "", "ts": 0}
 
 @app.route('/')
 def index():
     return "🍞 PiekarzBot działa 24/7 na Render!"
 
 @app.route('/now_playing')
+@cross_origin()
 def now_playing():
     return jsonify(current_sound)
 
 def run_web():
-    port = int(os.environ.get('PORT', 10000))  # Render przekazuje PORT jako zmienną
+    port = int(os.environ.get('PORT', 10000))
     app.run(host='0.0.0.0', port=port)
 
-# Start serwera Flask w osobnym wątku
+# Start Flask w tle
 threading.Thread(target=run_web).start()
 
-# 🔥 PiekarzBot IRC logic
+# 🔥 IRC logic
 load_dotenv()
 TWITCH_SERVER  = "irc.chat.twitch.tv"
-TWITCH_PORT    = 6697  # SSL port
+TWITCH_PORT    = 6697
 TWITCH_TOKEN   = os.getenv("TWITCH_TOKEN")
 TWITCH_NICK    = os.getenv("TWITCH_NICK")
 TWITCH_CHANNEL = os.getenv("TWITCH_CHANNEL").lower()
@@ -48,7 +49,6 @@ komendy = {
 }
 
 def update_now_playing(sound_id: str):
-    # Aktualizacja zmiennej globalnej dla playera
     current_sound["sound"] = sound_id
     current_sound["ts"] = int(time.time())
 
@@ -62,7 +62,7 @@ def is_admin(tags_line: str) -> bool:
     badges = parsed.get("badges", "")
     return "broadcaster" in badges or "moderator" in badges
 
-# Połączenie z IRC przez SSL
+# IRC Połączenie
 context = ssl.create_default_context()
 sock = context.wrap_socket(socket.socket(), server_hostname=TWITCH_SERVER)
 sock.connect((TWITCH_SERVER, TWITCH_PORT))
@@ -117,12 +117,24 @@ while True:
             send_message(f"Komendy: {txt}")
 
         elif message == "!zart":
+            try:
+                r = requests.get("https://api.chucknorris.io/jokes/random", timeout=5)
+                r.raise_for_status()
+                joke = r.json().get("value", "😅 Brak żartu")
+                send_message(f"🥋 {joke}")
+            except:
+                send_message("😢 Nie udało się pobrać żartu")
             update_now_playing("api:joke")
-            send_message("🥋 Pobieram żart...")
 
         elif message == "!kot":
+            try:
+                r = requests.get("https://api.thecatapi.com/v1/images/search", timeout=5)
+                r.raise_for_status()
+                img = r.json()[0].get("url", "")
+                send_message(f"🐱 {img}" if img else "😿 Nie udało się pobrać kotka")
+            except:
+                send_message("😿 Nie udało się pobrać kotka")
             update_now_playing("api:cat")
-            send_message("🐱 Pobieram kotka...")
 
         elif message in ("!wyznanie", "!niestreamer"):
             if is_admin(tags):
