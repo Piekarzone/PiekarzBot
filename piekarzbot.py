@@ -1,11 +1,3 @@
-# 💡 Propozycja zmian:
-# 1️⃣ Dodać printy do konsoli, które pokażą:
-#     ✅ kiedy bot łączy się z serwerem Twitch
-#     ✅ kiedy bot dołącza do kanału
-#     ✅ każdą wiadomość z czatu (kto i co napisał)
-# 2️⃣ Nic w logice bota się nie zmienia – to tylko więcej informacji w konsoli dla Ciebie.
-# Czy wprowadzić te zmiany?
-
 import os
 import socket
 import json
@@ -13,23 +5,33 @@ import base64
 import time
 import requests
 from dotenv import load_dotenv
-from typing import Optional
+from flask import Flask
+import threading
 
+# Flask app to keep Render Web Service alive
+app = Flask(__name__)
+
+@app.route('/')
+def index():
+    return "🍞 PiekarzBot działa 24/7 na Render!"
+
+def run_web():
+    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 8080)))
+
+# Start the web server in a separate thread
+threading.Thread(target=run_web).start()
+
+# PiekarzBot IRC logic
 load_dotenv()
 TWITCH_SERVER  = "irc.chat.twitch.tv"
 TWITCH_PORT    = 6667
-TWITCH_TOKEN: Optional[str] = os.getenv("TWITCH_TOKEN")
-TWITCH_NICK: Optional[str] = os.getenv("TWITCH_NICK")
-
-# Ensure TWITCH_CHANNEL is set and lowercase it safely
-twitch_channel_env: Optional[str] = os.getenv("TWITCH_CHANNEL")
-if twitch_channel_env is None:
-    raise ValueError("Environment variable TWITCH_CHANNEL is not set")
-TWITCH_CHANNEL: str = twitch_channel_env.lower()
+TWITCH_TOKEN   = os.getenv("TWITCH_TOKEN")
+TWITCH_NICK    = os.getenv("TWITCH_NICK")
+TWITCH_CHANNEL = os.getenv("TWITCH_CHANNEL").lower()
 CHANNEL        = f"#{TWITCH_CHANNEL}"
 
-GITHUB_TOKEN: Optional[str] = os.getenv("GITHUB_TOKEN")
-GITHUB_REPO: Optional[str] = os.getenv("GITHUB_REPO")
+GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
+GITHUB_REPO  = os.getenv("GITHUB_REPO")
 HEADERS = {
     "Authorization": f"token {GITHUB_TOKEN}",
     "Accept":        "application/vnd.github.v3+json"
@@ -44,31 +46,26 @@ komendy = {
     "!ding":     "Dźwięk DING"
 }
 
-last_played_sound = {"sound": None}
-
 def update_now_playing(sound_id: str):
     path    = "docs/now_playing.json"
     api_url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{path}"
 
-    response1 = requests.get(api_url, headers=HEADERS)
-    response1.raise_for_status()
-    sha = response1.json().get("sha")
+    r1 = requests.get(api_url, headers=HEADERS); r1.raise_for_status()
+    sha = r1.json()["sha"]
 
     payload = {"sound": sound_id, "ts": int(time.time())}
-    encoded_payload = json.dumps(payload, separators=(",", ":")).encode("utf-8")
-    b64_content = base64.b64encode(encoded_payload).decode("utf-8")
+    raw     = json.dumps(payload, separators=(",",":")).encode("utf-8")
+    b64     = base64.b64encode(raw).decode("utf-8")
 
     body = {
         "message": f"now_playing → {sound_id}",
-        "content": b64_content,
+        "content": b64,
         "sha": sha
     }
-    response2 = requests.put(api_url, headers=HEADERS, json=body)
-    response2.raise_for_status()
-    last_played_sound["sound"] = sound_id
+    r2 = requests.put(api_url, headers=HEADERS, json=body)
+    r2.raise_for_status()
 
 def send_message(text: str):
-    print(f"[SEND] {text}")
     sock.send(f"PRIVMSG {CHANNEL} :{text}\r\n".encode("utf-8"))
 
 def is_admin(tags_line: str) -> bool:
@@ -79,10 +76,8 @@ def is_admin(tags_line: str) -> bool:
     return "broadcaster" in badges or "moderator" in badges
 
 # Połączenie z IRC
-print("[INFO] Łączenie z Twitch IRC...")
 sock = socket.socket()
 sock.connect((TWITCH_SERVER, TWITCH_PORT))
-print("[INFO] Połączono z Twitch IRC.")
 for cmd in (
     f"PASS {TWITCH_TOKEN}",
     f"NICK {TWITCH_NICK}",
@@ -92,7 +87,6 @@ for cmd in (
     f"JOIN {CHANNEL}"
 ):
     sock.send((cmd + "\r\n").encode("utf-8"))
-print(f"[INFO] Dołączono do kanału {CHANNEL}")
 
 # Powitanie (001)
 while True:
@@ -125,9 +119,7 @@ while True:
             continue
         prefix, _, _, trailing = parts
         message = trailing.lstrip(":").strip()
-        user    = prefix.lstrip(":").split("!")[0].lower()
-
-        print(f"[CHAT] <{user}> {message}")
+        user    = prefix.lstrip(":").split("!",1)[0].lower()
 
         if message == "!hello":
             send_message(f"Hej {user}, tu Piekarzonebot! 🥖")
@@ -141,7 +133,7 @@ while True:
                 r = requests.get("https://api.chucknorris.io/jokes/random", timeout=5)
                 r.raise_for_status()
                 send_message(f"🥋 {r.json().get('value','')}")
-            except requests.RequestException:
+            except:
                 send_message("😢 Nie udało się pobrać żartu")
 
         elif message == "!kot":
@@ -149,7 +141,7 @@ while True:
                 r = requests.get("https://api.thecatapi.com/v1/images/search", timeout=5)
                 r.raise_for_status()
                 send_message(f"🐱 {r.json()[0].get('url','')}")
-            except requests.RequestException:
+            except:
                 send_message("😿 Nie udało się pobrać kotka")
 
         elif message in ("!wyznanie", "!ding"):
