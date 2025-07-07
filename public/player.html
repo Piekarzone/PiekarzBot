@@ -16,7 +16,7 @@
                 const sound = await response.text();
                 if (sound && sound !== lastSound) {
                     lastSound = sound.trim();
-                    audio.src = `https://raw.githubusercontent.com/<TwojUser>/<TwojeRepo>/main/sounds/${lastSound}.mp3`;
+                    audio.src = `https://raw.githubusercontent.com/Piekarzone/PiekarzBot/main/sounds/${lastSound}.mp3`;
                     audio.play();
                 }
             } catch (e) {
