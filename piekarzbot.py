@@ -35,22 +35,39 @@ def send_message(msg_text):
 last_coin_flip = {}
 last_scavfight = {}
 all_users = set()
+greetings = ["siema", "hej", "hejka", "witam", "czesc", "dzień dobry", "dzien dobry"]
+sound_commands = ["wyznanie", "niestreamer"]
+
+def update_current_sound(sound_name):
+    try:
+        with open("public/current_sound.txt", "w") as file:
+            file.write(sound_name)
+        print(f"Zaktualizowano current_sound.txt na '{sound_name}'")
+    except Exception as e:
+        print(f"Błąd zapisu current_sound.txt: {e}")
 
 def handle_command(user, user_message):
     cleaned_message = user_message.lower().strip()
     current_time = time.time()
     all_users.add(user)
 
-    if "piekarzbot" in cleaned_message:
-        if "rzuc moneta" in cleaned_message:
+    # Powitania bez $
+    if any(cleaned_message == greet for greet in greetings):
+        send_message(f"@{user} Witam na streamku!")
+        return
+
+    # Komendy zaczynające się od $
+    if cleaned_message.startswith("$"):
+        command = cleaned_message[1:]  # usuń $
+        if command == "rzutmoneta":
             last_time = last_coin_flip.get(user, 0)
             if current_time - last_time >= 5:
                 wynik = random.choice(["orzeł", "reszka"])
                 send_message(f"@{user} wynik: {wynik}")
                 last_coin_flip[user] = current_time
             else:
-                send_message(f"@{user} poczekaj {int(5 - (current_time - last_time))} sekund przed kolejnym rzutem monetą.")
-        elif "scavfight" in cleaned_message:
+                send_message(f"@{user} ⏳ Poczekaj {int(5 - (current_time - last_time))} sekund przed kolejnym rzutem monetą.")
+        elif command == "scavfight":
             last_time = last_scavfight.get(user, 0)
             if current_time - last_time >= 10:
                 random_scav = random.choice(list(all_users - {user})) if len(all_users) > 1 else "inny gracz"
@@ -75,9 +92,10 @@ def handle_command(user, user_message):
                 send_message(f"@{user} wynik walki: {wynik}")
                 last_scavfight[user] = current_time
             else:
-                send_message(f"@{user} poczekaj {int(10 - (current_time - last_time))} sekund przed kolejną walką scavfight.")
-        elif any(greet in cleaned_message for greet in ["siema", "hej", "hejka", "witam", "czesc", "dzień dobry", "dzien dobry"]):
-            send_message(f"@{user} Witam na streamku!")
+                send_message(f"@{user} ⏳ Poczekaj {int(10 - (current_time - last_time))} sekund przed kolejną walką scavfight.")
+        elif command in sound_commands:
+            update_current_sound(command)
+            send_message(f"@{user} ▶️ Odtwarzam dźwięk: {command}")
 
 try:
     buffer = ""

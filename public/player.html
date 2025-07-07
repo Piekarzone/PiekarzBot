@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <title>PiekarzBot Player</title>
+</head>
+<body>
+    <audio id="soundPlayer" autoplay></audio>
+    <script>
+        const audio = document.getElementById('soundPlayer');
+        let lastSound = '';
+
+        async function checkForUpdate() {
+            try {
+                const response = await fetch('current_sound.txt?cache=' + new Date().getTime());
+                const sound = await response.text();
+                if (sound && sound !== lastSound) {
+                    lastSound = sound.trim();
+                    audio.src = `https://raw.githubusercontent.com/<TwojUser>/<TwojeRepo>/main/sounds/${lastSound}.mp3`;
+                    audio.play();
+                }
+            } catch (e) {
+                console.error('Błąd ładowania dźwięku:', e);
+            }
+        }
+
+        setInterval(checkForUpdate, 1000); // Sprawdzaj co sekundę
+    </script>
+</body>
+</html>
